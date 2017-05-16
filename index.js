@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var ccPlayer = require('chromecast-player')();
+var opts = require('minimist')(process.argv.slice(2));
 var ffmpeg = require('fluent-ffmpeg');
 var tempDir = require('os').tmpdir();
 var fs = require('fs');
@@ -141,6 +142,24 @@ if (!input) {
 
 console.log('launching player with input file:', input);
 
+var keyMappings = {
+  space: function() {
+      if (p.currentSession.playerState === 'PLAYING') {
+        p.pause();
+      } else if (p.currentSession.playerState === 'PAUSED') {
+        p.play();
+      }
+    },
+  
+  s: function() {
+      p.stop();
+    },
+  
+  q: function() {
+      process.exit();
+    }
+};
+
 ccPlayer.launch(input, function(err, p, ctx) {
   if (err) return console.log(err);
 
@@ -148,6 +167,28 @@ ccPlayer.launch(input, function(err, p, ctx) {
 
   if (ctx.options.supportControls) {
     console.log('use left/right arrows to seek and the space-key to toggle between pause and play');
+  }
+  
+  if(opts.command) {
+        var commands = opts.command.split(",");
+    commands.forEach(function(command) {
+      if (!keyMappings[command]) {
+        fatalError('invalid --command: ' + command);
+      }
+    });
+
+    var index = 0;
+    function run_commands() {
+      if (index < commands.length) {
+        var command = commands[index++];
+        keyMappings[command]();
+        p.getStatus(run_commands);
+      } else {
+        if (opts.exit) {
+          process.exit();
+        }
+      }
+    } 
   }
 
   var stdin = process.stdin;
